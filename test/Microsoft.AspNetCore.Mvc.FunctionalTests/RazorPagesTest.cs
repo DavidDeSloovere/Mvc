@@ -355,8 +355,11 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             Assert.Equal("Hello, handler!", content.Trim());
         }
 
-        [Fact]
-        public async Task HelloWorldWithPageModelHandler_CanPostContent()
+        [Theory]
+        [InlineData("POST")]
+        [InlineData("poST")]
+        [InlineData("PUT")]
+        public async Task HelloWorldWithPageModelHandler_CanPostContent(string httpMethod)
         {
             // Arrange
             var getRequest = new HttpRequestMessage(HttpMethod.Get, "http://localhost/HelloWorldWithPageModelHandler?message=message");
@@ -366,7 +369,7 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             var cookie = AntiforgeryTestHelper.RetrieveAntiforgeryCookie(getResponse);
 
 
-            var postRequest = new HttpRequestMessage(HttpMethod.Post, "http://localhost/HelloWorldWithPageModelHandler");
+            var postRequest = new HttpRequestMessage(new HttpMethod(httpMethod), "http://localhost/HelloWorldWithPageModelHandler");
             postRequest.Headers.Add("Cookie", cookie.Key + "=" + cookie.Value);
             postRequest.Headers.Add("RequestVerificationToken", formToken);
 
@@ -380,11 +383,15 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             Assert.StartsWith("Hello, You posted!", content.Trim());
         }
 
-        [Fact]
-        public async Task HelloWorldWithPageModelHandler_CanGetContent()
+        [Theory]
+        [InlineData("GET")]
+        [InlineData("GeT")]
+        [InlineData("HEAD")]
+        public async Task HelloWorldWithPageModelHandler_CanGetContent(string httpMethod)
         {
             // Arrange
-            var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/HelloWorldWithPageModelHandler?message=pagemodel");
+            var url = "http://localhost/HelloWorldWithPageModelHandler?message=pagemodel";
+            var request = new HttpRequestMessage(new HttpMethod(httpMethod), url);
 
             // Act
             var response = await Client.SendAsync(request);

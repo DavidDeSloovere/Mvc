@@ -3,11 +3,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Primitives;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
@@ -15,7 +14,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
     public class DefaultPageHandlerMethodSelectorTest
     {
         [Fact]
-        public void Select_ReturnsNull_WhenNoHandlerMatchesHttpMethod()
+        public void LegacyBehavior_Select_ReturnsNull_WhenNoHandlerMatchesHttpMethod()
         {
             // Arrange
             var descriptor1 = new HandlerMethodDescriptor
@@ -47,13 +46,244 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector(legacyBehavior: true);
 
             // Act
             var actual = selector.Select(pageContext);
 
             // Assert
             Assert.Null(actual);
+        }
+
+        [Fact]
+        public void NewBehavior_Select_ReturnsFuzzyMatch_WhenNoHandlerMatchesHttpMethod()
+        {
+            // Arrange
+            var descriptor1 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "GET"
+            };
+
+            var descriptor2 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "POST"
+            };
+
+            var pageContext = new PageContext
+            {
+                ActionDescriptor = new CompiledPageActionDescriptor
+                {
+                    HandlerMethods = new List<HandlerMethodDescriptor>()
+                    {
+                        descriptor1,
+                        descriptor2,
+                    },
+                },
+                RouteData = new RouteData(),
+                HttpContext = new DefaultHttpContext
+                {
+                    Request =
+                    {
+                        Method = "PUT"
+                    },
+                },
+            };
+            var selector = CreateSelector();
+
+            // Act
+            var actual = selector.Select(pageContext);
+
+            // Assert
+            Assert.Same(descriptor2, actual);
+        }
+
+        [Fact]
+        public void NewBehavior_Select_PrefersExactMatch()
+        {
+            // Arrange
+            var descriptor1 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "GET"
+            };
+
+            var descriptor2 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "POST"
+            };
+
+            var descriptor3 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "HEAD"
+            };
+
+            var pageContext = new PageContext
+            {
+                ActionDescriptor = new CompiledPageActionDescriptor
+                {
+                    HandlerMethods = new List<HandlerMethodDescriptor>()
+                    {
+                        descriptor1,
+                        descriptor2,
+                        descriptor3,
+                    },
+                },
+                RouteData = new RouteData(),
+                HttpContext = new DefaultHttpContext
+                {
+                    Request =
+                    {
+                        Method = "HEAD",
+                    },
+                },
+            };
+            var selector = CreateSelector();
+
+            // Act
+            var actual = selector.Select(pageContext);
+
+            // Assert
+            Assert.Same(descriptor3, actual);
+        }
+
+        [Fact]
+        public void NewBehavior_Select_PrefersExactMatch_ReturnsNullWhenHandlerDoesntMatch()
+        {
+            // Arrange
+            var descriptor1 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "GET"
+            };
+
+            var descriptor2 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "POST"
+            };
+
+            // This will match the HTTP method 'round' of selection, but won't match the
+            // handler name.
+            var descriptor3 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "HEAD",
+                Name = "not-provided",
+            };
+
+            var pageContext = new PageContext
+            {
+                ActionDescriptor = new CompiledPageActionDescriptor
+                {
+                    HandlerMethods = new List<HandlerMethodDescriptor>()
+                    {
+                        descriptor1,
+                        descriptor2,
+                        descriptor3,
+                    },
+                },
+                RouteData = new RouteData(),
+                HttpContext = new DefaultHttpContext
+                {
+                    Request =
+                    {
+                        Method = "HEAD",
+                    },
+                },
+            };
+            var selector = CreateSelector();
+
+            // Act
+            var actual = selector.Select(pageContext);
+
+            // Assert
+            Assert.Null(actual);
+        }
+
+        [Theory]
+        [InlineData("HEAD")]
+        [InlineData("TRACE")]
+        [InlineData("OPTIONS")]
+        public void NewBehavior_Select_ReturnsFuzzyMatch_SafeVerbs(string httpMethod)
+        {
+            // Arrange
+            var descriptor1 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "GET"
+            };
+
+            var descriptor2 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "POST"
+            };
+
+            var pageContext = new PageContext
+            {
+                ActionDescriptor = new CompiledPageActionDescriptor
+                {
+                    HandlerMethods = new List<HandlerMethodDescriptor>()
+                    {
+                        descriptor1,
+                        descriptor2,
+                    },
+                },
+                RouteData = new RouteData(),
+                HttpContext = new DefaultHttpContext
+                {
+                    Request =
+                    {
+                        Method = httpMethod
+                    },
+                },
+            };
+            var selector = CreateSelector();
+
+            // Act
+            var actual = selector.Select(pageContext);
+
+            // Assert
+            Assert.Same(descriptor1, actual);
+        }
+
+        [Theory]
+        [InlineData("PUT")]
+        [InlineData("DELETE")]
+        [InlineData("SOME_MADEUP_THING")]
+        public void NewBehavior_Select_ReturnsFuzzyMatch_UnsafeVerbs(string httpMethod)
+        {
+            // Arrange
+            var descriptor1 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "GET"
+            };
+
+            var descriptor2 = new HandlerMethodDescriptor
+            {
+                HttpMethod = "POST"
+            };
+
+            var pageContext = new PageContext
+            {
+                ActionDescriptor = new CompiledPageActionDescriptor
+                {
+                    HandlerMethods = new List<HandlerMethodDescriptor>()
+                    {
+                        descriptor1,
+                        descriptor2,
+                    },
+                },
+                RouteData = new RouteData(),
+                HttpContext = new DefaultHttpContext
+                {
+                    Request =
+                    {
+                        Method = httpMethod
+                    },
+                },
+            };
+            var selector = CreateSelector();
+
+            // Act
+            var actual = selector.Select(pageContext);
+
+            // Assert
+            Assert.Same(descriptor2, actual);
         }
 
         [Fact]
@@ -83,7 +313,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector();
 
             // Act
             var actual = selector.Select(pageContext);
@@ -126,7 +356,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector();
 
             // Act
             var actual = selector.Select(pageContext);
@@ -176,7 +406,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector();
 
             // Act
             var actual = selector.Select(pageContext);
@@ -226,7 +456,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector();
 
             // Act
             var actual = selector.Select(pageContext);
@@ -271,7 +501,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector();
 
             // Act
             var actual = selector.Select(pageContext);
@@ -322,7 +552,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector();
 
             // Act
             var actual = selector.Select(pageContext);
@@ -367,7 +597,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector();
 
             // Act
             var actual = selector.Select(pageContext);
@@ -416,7 +646,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector();
 
             // Act
             var actual = selector.Select(pageContext);
@@ -466,7 +696,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector();
 
             // Act & Assert
             var ex = Assert.Throws<InvalidOperationException>(() => selector.Select(pageContext));
@@ -526,7 +756,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                     },
                 },
             };
-            var selector = new DefaultPageHandlerMethodSelector();
+            var selector = CreateSelector();
 
             // Act & Assert
             var ex = Assert.Throws<InvalidOperationException>(() => selector.Select(pageContext));
@@ -543,6 +773,15 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
         protected void PostAsync()
         {
+        }
+
+        private static DefaultPageHandlerMethodSelector CreateSelector(bool legacyBehavior = false)
+        {
+            var options = Options.Create(new RazorPagesOptions()
+            {
+                AllowFuzzyHttpMethodMatching = !legacyBehavior
+            });
+            return new DefaultPageHandlerMethodSelector(options);
         }
     }
 }
