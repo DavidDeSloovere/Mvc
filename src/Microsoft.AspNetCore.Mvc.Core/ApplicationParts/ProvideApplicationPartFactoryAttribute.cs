@@ -12,13 +12,16 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false)]
     public sealed class ProvideApplicationPartFactoryAttribute : Attribute
     {
+        private readonly Type _applicationPartFactoryType;
+        private readonly string _applicationPartFactoryTypeName;
+
         /// <summary>
         /// Creates a new instance of <see cref="ProvideApplicationPartFactoryAttribute"/> with the specified type.
         /// </summary>
         /// <param name="factoryType">The factory type.</param>
         public ProvideApplicationPartFactoryAttribute(Type factoryType)
         {
-            ApplicationPartFactoryType = factoryType ?? throw new ArgumentNullException(nameof(factoryType));
+            _applicationPartFactoryType = factoryType ?? throw new ArgumentNullException(nameof(factoryType));
         }
 
         /// <summary>
@@ -32,18 +35,8 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
                 throw new ArgumentException(Resources.ArgumentCannotBeNullOrEmpty, nameof(factoryTypeName));
             }
 
-            ApplicationPartFactoryTypeName = factoryTypeName;
+            _applicationPartFactoryTypeName = factoryTypeName;
         }
-
-        /// <summary>
-        /// The factory type.
-        /// </summary>
-        private Type ApplicationPartFactoryType { get; }
-
-        /// <summary>
-        /// The factory type name.
-        /// </summary>
-        private string ApplicationPartFactoryTypeName { get; }
 
         /// <summary>
         /// Gets the factory type.
@@ -51,8 +44,8 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
         /// <returns></returns>
         public Type GetFactoryType()
         {
-            return ApplicationPartFactoryType ??
-                Type.GetType(ApplicationPartFactoryTypeName, throwOnError: true);
+            return _applicationPartFactoryType ??
+                Type.GetType(_applicationPartFactoryTypeName, throwOnError: true);
         }
     }
 }

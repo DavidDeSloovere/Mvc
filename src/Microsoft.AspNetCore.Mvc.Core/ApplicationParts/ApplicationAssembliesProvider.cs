@@ -76,7 +76,7 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
         private List<AssemblyItem> ResolveFromDependencyContext(DependencyContext dependencyContext)
         {
             var assemblyItems = new List<AssemblyItem>();
-            var associatedAssemblies = new HashSet<Assembly>();
+            var relatedAssemblies = new Dictionary<Assembly, AssemblyItem>();
 
             var candidateAssemblies = GetCandidateLibraries(dependencyContext)
                 .SelectMany(library => GetLibraryAssemblies(dependencyContext, library));
@@ -86,14 +86,25 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
                 var assemblyItem = GetAssemblyItem(assembly);
                 assemblyItems.Add(assemblyItem);
 
-                foreach (var associatedAssembly in assemblyItem.RelatedAssemblies)
+                foreach (var relatedAssembly in assemblyItem.RelatedAssemblies)
                 {
-                    associatedAssemblies.Add(associatedAssembly);
+                    if (relatedAssemblies.TryGetValue(relatedAssembly, out var otherEntry))
+                    {
+                        var message = string.Join(
+                            Environment.NewLine,
+                            Resources.FormatApplicationAssembliesProvider_DuplicateRelatedAssembly(relatedAssembly.FullName),
+                            otherEntry.Assembly.FullName,
+                            assembly.FullName);
+
+                        throw new InvalidOperationException(message);
+                    }
+
+                    relatedAssemblies.Add(relatedAssembly, assemblyItem);
                 }
             }
 
             // Remove any top level assemblies that appear as an associated assembly.
-            assemblyItems.RemoveAll(item => associatedAssemblies.Contains(item.Assembly));
+            assemblyItems.RemoveAll(item => relatedAssemblies.ContainsKey(item.Assembly));
 
             return assemblyItems;
         }
@@ -107,10 +118,26 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
             }
         }
 
-        protected virtual AssemblyItem GetAssemblyItem(Assembly assembly)
+        protected virtual IReadOnlyList<Assembly> GetRelatedAssemblies(Assembly assembly)
         {
             // Do not require related assemblies to be available in the default code path.
-            var relatedAssemblies = RelatedAssemblyAttribute.GetRelatedAssemblies(assembly, throwOnError: false);
+            return RelatedAssemblyAttribute.GetRelatedAssemblies(assembly, throwOnError: false);
+        }
+
+        private AssemblyItem GetAssemblyItem(Assembly assembly)
+        {
+            var relatedAssemblies = GetRelatedAssemblies(assembly);
+
+            // Ensure we don't have any cycles. A cycle could be formed if a related assembly points to the primary assembly.
+            foreach (var relatedAssembly in relatedAssemblies)
+            {
+                if (relatedAssembly.IsDefined(typeof(RelatedAssemblyAttribute)))
+                {
+                    throw new InvalidOperationException(
+                        Resources.FormatApplicationAssembliesProvider_RelatedAssemblyCannotDefineAdditional(relatedAssembly.FullName, assembly.FullName));
+                }
+            }
+
             return new AssemblyItem(assembly, relatedAssemblies);
         }
 
@@ -240,7 +267,7 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
             }
         }
 
-        internal readonly struct AssemblyItem
+        private readonly struct AssemblyItem
         {
             public AssemblyItem(Assembly assembly, IReadOnlyList<Assembly> associatedAssemblies)
             {

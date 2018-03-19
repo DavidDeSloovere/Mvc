@@ -5,7 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyModel;
+using Moq;
 using Xunit;
 
 namespace Microsoft.AspNetCore.Mvc.ApplicationParts
@@ -28,22 +30,17 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
         }
 
         [Fact]
-        public void ResolveAssemblies_ReturnsRelatedPartsOrderedByName()
+        public void ResolveAssemblies_ReturnsRelatedAssembliesOrderedByName()
         {
             // Arrange
             var assembly1 = typeof(ApplicationAssembliesProvider).Assembly;
             var assembly2 = typeof(IActionResult).Assembly;
             var assembly3 = typeof(FactAttribute).Assembly;
 
-            var item = new ApplicationAssembliesProvider.AssemblyItem(TestAssembly, new[]
-            {
-                assembly1,
-                assembly2,
-                assembly3,
-            });
+            var relatedAssemblies = new[] { assembly1, assembly2, assembly3 };
             var provider = new TestApplicationAssembliesProvider
             {
-                GetAssemblyItemDelegate = (assembly) => item,
+                GetRelatedAssembliesDelegate = (assembly) => relatedAssemblies,
             };
 
             // Act
@@ -80,7 +77,7 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
         }
 
         [Fact]
-        public void ResolveAssemblies_ReturnsRelatedPartsForLibrariesFromDepsFile()
+        public void ResolveAssemblies_ReturnsRelatedAssembliesForLibrariesFromDepsFile()
         {
             // Arrange
             var mvcAssembly = typeof(IActionResult).Assembly;
@@ -98,14 +95,14 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
             var provider = new TestApplicationAssembliesProvider
             {
                 DependencyContext = dependencyContext,
-                GetAssemblyItemDelegate = (assembly) =>
+                GetRelatedAssembliesDelegate = (assembly) =>
                 {
                     if (assembly == classLibrary)
                     {
-                        return new ApplicationAssembliesProvider.AssemblyItem(classLibrary, new[] { relatedPart });
+                        return new[] { relatedPart };
                     }
 
-                    return new ApplicationAssembliesProvider.AssemblyItem(assembly, Array.Empty<Assembly>());
+                    return Array.Empty<Assembly>();
                 },
             };
 
@@ -114,6 +111,70 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
 
             // Assert
             Assert.Equal(new[] { TestAssembly, classLibrary, relatedPart, }, result);
+        }
+
+        [Fact]
+        public void ResolveAssemblies_ThrowsIfRelatedAssemblyDefinesAdditionalRelatedAssemblies()
+        {
+            // Arrange
+            var expected = $"Assembly 'TestRelatedAssembly' declared as a related assembly by assembly '{TestAssembly}' cannot define additional related assemblies.";
+            var assembly1 = typeof(ApplicationAssembliesProvider).Assembly;
+            var assembly2 = new Mock<Assembly>();
+            assembly2.Setup(m => m.FullName).Returns("TestRelatedAssembly");
+            assembly2.Setup(m => m.IsDefined(typeof(RelatedAssemblyAttribute), It.IsAny<bool>()))
+                .Returns(true);
+
+            var relatedAssemblies = new[] { assembly1, assembly2.Object };
+            var provider = new TestApplicationAssembliesProvider
+            {
+                GetRelatedAssembliesDelegate = (assembly) => relatedAssemblies,
+            };
+
+            // Act & Assert
+            var ex = Assert.Throws<InvalidOperationException>(() => provider.ResolveAssemblies(TestAssembly).ToArray());
+            Assert.Equal(expected, ex.Message);
+        }
+
+        [Fact]
+        public void ResolveAssemblies_ThrowsIfMultipleAssembliesDeclareTheSameRelatedPart()
+        {
+            // Arrange
+            var mvcAssembly = typeof(IActionResult).Assembly;
+            var libraryAssembly1 = typeof(object).Assembly;
+            var libraryAssembly2 = typeof(HttpContext).Assembly;
+            var relatedPart = typeof(FactAttribute).Assembly;
+            var expected = string.Join(
+                Environment.NewLine,
+                $"Each related assembly must be declared by exactly one assembly. The assembly '{relatedPart.FullName}' was declared as related assembly by the following:",
+                libraryAssembly1.FullName,
+                libraryAssembly2.FullName);
+
+            var dependencyContext = GetDependencyContext(new[]
+            {
+                GetLibrary(TestAssembly.GetName().Name, new[] { relatedPart.GetName().Name, libraryAssembly1.GetName().Name }),
+                GetLibrary(libraryAssembly1.GetName().Name, new[] { mvcAssembly.GetName().Name }),
+                GetLibrary(libraryAssembly2.GetName().Name, new[] { mvcAssembly.GetName().Name }),
+                GetLibrary(mvcAssembly.GetName().Name),
+            });
+
+            var provider = new TestApplicationAssembliesProvider
+            {
+                DependencyContext = dependencyContext,
+                GetRelatedAssembliesDelegate = (assembly) =>
+                {
+                    if (assembly == libraryAssembly1 || assembly == libraryAssembly2)
+                    {
+                        return new[] { relatedPart };
+                    }
+
+                    return Array.Empty<Assembly>();
+                },
+            };
+
+
+            // Act & Assert
+            var ex = Assert.Throws<InvalidOperationException>(() => provider.ResolveAssemblies(TestAssembly).ToArray());
+            Assert.Equal(expected, ex.Message);
         }
 
         [Fact]
@@ -327,11 +388,11 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
         {
             public DependencyContext DependencyContext { get; set; }
 
-            public Func<Assembly, AssemblyItem> GetAssemblyItemDelegate { get; set; } = (assembly) => new AssemblyItem(assembly, Array.Empty<Assembly>());
+            public Func<Assembly, IReadOnlyList<Assembly>> GetRelatedAssembliesDelegate { get; set; } = (assembly) => Array.Empty<Assembly>();
 
             protected override DependencyContext LoadDependencyContext(Assembly assembly) => DependencyContext;
 
-            protected override AssemblyItem GetAssemblyItem(Assembly assembly) => GetAssemblyItemDelegate(assembly);
+            protected override IReadOnlyList<Assembly> GetRelatedAssemblies(Assembly assembly) => GetRelatedAssembliesDelegate(assembly);
 
             protected override IEnumerable<Assembly> GetLibraryAssemblies(DependencyContext dependencyContext, RuntimeLibrary runtimeLibrary)
             {
