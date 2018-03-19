@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc.Core;
 namespace Microsoft.AspNetCore.Mvc.ApplicationParts
 {
     /// <summary>
-    /// Specifies a assembly to load as part of Mvc's assembly discovery mechanism.
+    /// Specifies a assembly to load as part of MVC's assembly discovery mechanism.
     /// </summary>
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed class RelatedAssemblyAttribute : Attribute
@@ -29,13 +29,13 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
                 throw new ArgumentException(Resources.ArgumentCannotBeNullOrEmpty, nameof(assemblyFileName));
             }
 
-            AssemblyName = assemblyFileName;
+            AssemblyFileName = assemblyFileName;
         }
 
         /// <summary>
         /// Gets the assembly file name without extension.
         /// </summary>
-        public string AssemblyName { get; }
+        public string AssemblyFileName { get; }
 
         /// <summary>
         /// Gets <see cref="Assembly"/> instances specified by <see cref="RelatedAssemblyAttribute"/>.
@@ -60,7 +60,7 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
                 throw new ArgumentNullException(nameof(assembly));
             }
 
-            // Mvc will specifically look for related parts in the same physical directory as the assembly.
+            // MVC will specifically look for related parts in the same physical directory as the assembly.
             // No-op if the assembly does not have a location.
             if (assembly.IsDynamic || string.IsNullOrEmpty(assembly.Location))
             {
@@ -80,19 +80,19 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
             for (var i = 0; i < attributes.Length; i++)
             {
                 var attribute = attributes[i];
-                if (string.Equals(assemblyName, attribute.AssemblyName, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(assemblyName, attribute.AssemblyFileName, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException(
                         Resources.FormatRelatedAssemblyAttribute_AssemblyCannotReferenceSelf(nameof(RelatedAssemblyAttribute), assemblyName));
                 }
 
-                var relatedAssemblyLocation = Path.Combine(assemblyDirectory, attribute.AssemblyName + ".dll");
+                var relatedAssemblyLocation = Path.Combine(assemblyDirectory, attribute.AssemblyFileName + ".dll");
                 if (!File.Exists(relatedAssemblyLocation))
                 {
                     if (throwOnError)
                     {
                         throw new FileNotFoundException(
-                            Resources.FormatRelatedAssemblyAttribute_CouldNotBeFound(attribute.AssemblyName, assemblyName, assemblyDirectory),
+                            Resources.FormatRelatedAssemblyAttribute_CouldNotBeFound(attribute.AssemblyFileName, assemblyName, assemblyDirectory),
                             relatedAssemblyLocation);
                     }
                     else

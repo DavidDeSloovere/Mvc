@@ -38,11 +38,21 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
         /// <summary>
         /// The factory type.
         /// </summary>
-        public Type ApplicationPartFactoryType { get; }
+        private Type ApplicationPartFactoryType { get; }
 
         /// <summary>
-        /// THe factory type name.
+        /// The factory type name.
         /// </summary>
-        public string ApplicationPartFactoryTypeName { get; }
+        private string ApplicationPartFactoryTypeName { get; }
+
+        /// <summary>
+        /// Gets the factory type.
+        /// </summary>
+        /// <returns></returns>
+        public Type GetFactoryType()
+        {
+            return ApplicationPartFactoryType ??
+                Type.GetType(ApplicationPartFactoryTypeName, throwOnError: true);
+        }
     }
 }

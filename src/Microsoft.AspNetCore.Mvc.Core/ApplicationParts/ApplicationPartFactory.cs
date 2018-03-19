@@ -57,12 +57,7 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
                 return ApplicationPartFactory.Default;
             }
 
-            var type = provideAttribute.ApplicationPartFactoryType;
-            if (type == null)
-            {
-                type = Type.GetType(provideAttribute.ApplicationPartFactoryTypeName, throwOnError: true);
-            }
-
+            var type = provideAttribute.GetFactoryType();
             if (!typeof(ApplicationPartFactory).IsAssignableFrom(type))
             {
                 throw new InvalidOperationException(Resources.FormatApplicationPartFactory_InvalidFactoryType(

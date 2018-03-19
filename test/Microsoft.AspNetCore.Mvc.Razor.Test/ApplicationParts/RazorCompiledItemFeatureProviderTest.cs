@@ -17,8 +17,8 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
         public void PopulateFeature_AddsItemsFromProviderTypes()
         {
             // Arrange
-            var item1 = Mock.Of<RazorCompiledItem>(i => i.Identifier == "Item1");
-            var item2 = Mock.Of<RazorCompiledItem>(i => i.Identifier == "Item2");
+            var item1 = Mock.Of<RazorCompiledItem>(i => i.Identifier == "Item1" && i.Type == typeof(TestView));
+            var item2 = Mock.Of<RazorCompiledItem>(i => i.Identifier == "Item2" && i.Type == typeof(TestPage));
             var part1 = new AssemblyPart(typeof(RazorCompiledItemFeatureProviderTest).Assembly);
             var part2 = new Mock<ApplicationPart>();
             part2
@@ -65,8 +65,8 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
         public void PopulateFeature_AllowsDuplicateItemsFromMultipleParts()
         {
             // Arrange
-            var item1 = Mock.Of<RazorCompiledItem>(i => i.Identifier == "Item");
-            var item2 = Mock.Of<RazorCompiledItem>(i => i.Identifier == "Item");
+            var item1 = Mock.Of<RazorCompiledItem>(i => i.Identifier == "Item" && i.Type == typeof(TestView));
+            var item2 = Mock.Of<RazorCompiledItem>(i => i.Identifier == "Item" && i.Type == typeof(TestPage));
             var part1 = new Mock<ApplicationPart>();
             part1
                 .As<IRazorCompiledItemProvider>()

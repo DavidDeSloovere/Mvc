@@ -64,7 +64,7 @@ namespace Microsoft.AspNetCore.Mvc.ApplicationParts
             {
                 yield return item.Assembly;
 
-                foreach (var associatedAssembly in item.RelatedAssemblies.OrderBy(assembly => assembly.FullName, StringComparer.Ordinal))
+                foreach (var associatedAssembly in item.RelatedAssemblies.Distinct().OrderBy(assembly => assembly.FullName, StringComparer.Ordinal))
                 {
                     yield return associatedAssembly;
                 }

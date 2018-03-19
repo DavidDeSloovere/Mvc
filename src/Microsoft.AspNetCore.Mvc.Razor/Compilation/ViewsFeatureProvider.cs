@@ -35,14 +35,12 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Compilation
                 {
                     // Ensure parts do not specify views with differing cases. This is not supported
                     // at runtime and we should flag at as such for precompiled views.
-                    var first = duplicates.ElementAt(0);
-                    var second = duplicates.ElementAt(1);
+                    var viewsDiffereningInCase = string.Join(Environment.NewLine, duplicates.Select(d => d.RelativePath));
 
                     var message = string.Join(
                         Environment.NewLine,
                         Resources.RazorViewCompiler_ViewPathsDifferOnlyInCase,
-                        first.RelativePath,
-                        second.RelativePath);
+                        viewsDiffereningInCase);
                     throw new InvalidOperationException(message);
                 }
 
