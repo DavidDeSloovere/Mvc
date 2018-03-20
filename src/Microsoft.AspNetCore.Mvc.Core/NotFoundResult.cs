@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 namespace Microsoft.AspNetCore.Mvc
 {
     /// <summary>
-    /// Represents an <see cref="StatusCodeResult"/> that when
+    /// A <see cref="StatusCodeResult"/> that when
     /// executed will produce a Not Found (404) response.
     /// </summary>
     public class NotFoundResult : StatusCodeResult
